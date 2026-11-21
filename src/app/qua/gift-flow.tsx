@@ -22,13 +22,18 @@ export function GiftFlow() {
   const [opening, setOpening] = useState(false);
 
   useEffect(() => {
-    setReplay(new URLSearchParams(window.location.search).get("replay") === "1");
     const sb = supabaseBrowser();
     Promise.all([
       sb.from("letters").select("*").eq("is_birthday", true).order("created_at", { ascending: false }).limit(1).maybeSingle(),
       sb.from("invitations").select("*").eq("is_birthday", true).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     ]).then(([l, i]) => {
+      // Next.js có thể giữ state của trang ẩn; mỗi lần mở lại bắt đầu từ phong bì.
+      setStep("envelope");
+      setOpening(false);
+      setBusy(false);
+      setReplay(new URLSearchParams(window.location.search).get("replay") === "1");
       if (l.error || i.error) { setErr("Không tải được quà. Hãy thử tải lại trang."); return; }
+      setErr("");
       setLetter((l.data as Letter) ?? null);
       setInvite((i.data as Invitation) ?? null);
       setLoaded(true);

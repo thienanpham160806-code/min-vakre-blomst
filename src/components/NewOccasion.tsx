@@ -11,7 +11,7 @@ import type { Background, FlowerKind, Wish } from "@/lib/types";
 export function NewOccasion({ open, onClose, wish }: { open: boolean; onClose: () => void; wish?: Wish }) {
   const router = useRouter();
   const [title, setTitle] = useState(wish?.title ?? "");
-  const [date, setDate] = useState(() => (wish?.done_at ?? new Date().toISOString()).slice(0, 10));
+  const [date, setDate] = useState(() => new Date(new Date(wish?.done_at ?? Date.now()).getTime() + 7 * 3600_000).toISOString().slice(0, 10));
   const [flower, setFlower] = useState<FlowerKind>("tulip");
   const [color, setColor] = useState(FLOWER_COLORS[0]);
   const [background, setBackground] = useState<Background>("kraft");

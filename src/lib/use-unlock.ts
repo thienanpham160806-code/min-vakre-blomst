@@ -18,10 +18,12 @@ export function useUnlock() {
         try {
           const { data, error } = await supabaseBrowser().rpc("unlock_info").single();
           if (!error && data) sample = { info: data as UnlockInfo, at: performance.now() };
+        } catch {
+          // Mất mạng: giữ mẫu máy chủ gần nhất, chưa có mẫu thì tiếp tục chờ.
         } finally {
           busy = false;
           const remaining = sample ? remainingMs(sample.info, performance.now() - sample.at) : Infinity;
-          nextSync = performance.now() + (remaining < 10_000 ? 1000 : 10_000);
+          nextSync = performance.now() + (remaining > 0 && remaining < 10_000 ? 1000 : 10_000);
         }
       }
       if (alive && sample) setLeft(remainingMs(sample.info, performance.now() - sample.at));

@@ -17,7 +17,7 @@ export default function LoginPage() {
     setError(null);
     const sb = supabaseBrowser();
     let { error } = await sb.auth.signInWithPassword({ email: email.trim(), password: code });
-    // Ẻm gõ "18/01/2024" hay "18-01-2024" thì thử lại với chỉ phần số
+    // Ẻm gõ "01/01/2000" hay "01-01-2000" (ví dụ giả) thì thử lại với chỉ phần số
     const digits = code.replace(/\D/g, "");
     if (error && digits !== code && digits.length >= 6) {
       ({ error } = await sb.auth.signInWithPassword({ email: email.trim(), password: digits }));

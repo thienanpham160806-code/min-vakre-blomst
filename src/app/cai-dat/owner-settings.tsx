@@ -49,6 +49,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 }
 
 function General({ unlockAt, togetherSince, finaleId }: { unlockAt: string; togetherSince: string | null; finaleId: string | null }) {
+  const [err, setErr] = useState("");
   const [finale, setFinale] = useState(finaleId ?? "");
   const [albums, setAlbums] = useState<Occasion[]>([]);
   useEffect(() => {
@@ -60,7 +61,6 @@ function General({ unlockAt, togetherSince, finaleId }: { unlockAt: string; toge
   const [unlock, setUnlock] = useState(toLocalInput(unlockAt));
   const [since, setSince] = useState(togetherSince ?? "");
   const [saved, setSaved] = useState(false);
-  const [err, setErr] = useState("");
 
   return (
     <Card title="Chung">
@@ -82,6 +82,7 @@ function General({ unlockAt, togetherSince, finaleId }: { unlockAt: string; toge
       {err && <p role="alert" className="text-blush-deep">{err}</p>}
       <button
         className="btn btn-primary"
+        disabled={!unlock}
         onClick={async () => {
           setSaved(false);
           setErr("");
@@ -113,7 +114,8 @@ function BirthdayInvite() {
   const [err, setErr] = useState("");
 
   useEffect(() => {
-    sb.from("invitations").select("*").eq("is_birthday", true).order("created_at", { ascending: false }).limit(1).maybeSingle().then(({ data }) => {
+    sb.from("invitations").select("*").eq("is_birthday", true).order("created_at", { ascending: false }).limit(1).maybeSingle().then(({ data, error }) => {
+      if (error) { setErr(error.message); return; }
       const i = data as Invitation | null;
       if (i) {
         setInv(i);
@@ -127,7 +129,7 @@ function BirthdayInvite() {
     });
   }, [sb]);
 
-  if (!loaded) return null;
+  if (!loaded) return err ? <p role="alert" className="text-blush-deep">{err}</p> : null;
 
   async function save() {
     const row = {
@@ -193,7 +195,10 @@ function Mails({ defaultTo }: { defaultTo: string }) {
   const [sendAt, setSendAt] = useState("2027-01-18T00:00");
 
   const load = useCallback(
-    () => sb.from("scheduled_mails").select("*").order("send_at").then(({ data }) => setMails((data as ScheduledMail[]) ?? [])),
+    () => sb.from("scheduled_mails").select("*").order("send_at").then(({ data, error }) => {
+      if (error) setErr(error.message);
+      else setMails((data as ScheduledMail[]) ?? []);
+    }),
     [sb],
   );
   useEffect(() => {
@@ -213,7 +218,7 @@ function Mails({ defaultTo }: { defaultTo: string }) {
               <p className="text-ink-soft">{m.to_email} · {formatDateTime(m.send_at)}</p>
               {m.last_error && !m.sent_at && <p className="text-blush-deep">{m.last_error}</p>}
             </div>
-            {!m.sent_at && <button className="text-xs text-ink-soft" onClick={async () => { const { error } = await sb.from("scheduled_mails").delete().eq("id", m.id); if (error) return setErr(error.message); setErr(""); load(); }}>xoá</button>}
+            {!m.sent_at && <button className="text-xs text-ink-soft" onClick={async () => { const { error } = await sb.from("scheduled_mails").delete().eq("id", m.id).select("id").single(); if (error) return setErr(error.message); setErr(""); load(); }}>xoá</button>}
           </li>
         ))}
       </ul>

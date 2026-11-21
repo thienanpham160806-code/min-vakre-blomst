@@ -17,6 +17,14 @@ import { FONT_CLASS, ItemView } from "./item-view";
 const PAGE_W = 1000;
 const PAGE_H = 1400;
 
+function randomPlacement() {
+  return {
+    x: PAGE_W / 2 + (Math.random() - 0.5) * 200,
+    y: PAGE_H / 2 + (Math.random() - 0.5) * 300,
+    rotation: Math.round((Math.random() - 0.5) * 12),
+  };
+}
+
 type Pt = { x: number; y: number };
 type Snapshot = Pick<AlbumItem, "x" | "y" | "width" | "rotation"> & { size?: number };
 type Gesture =
@@ -33,6 +41,7 @@ export function Scrapbook() {
 
   const [occasion, setOccasion] = useState<Occasion | null>(null);
   const [items, setItems] = useState<AlbumItem[]>([]);
+  const confirmed = useRef(new Map<string, AlbumItem>());
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [loaded, setLoaded] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -62,6 +71,7 @@ export function Scrapbook() {
     setDeleted((list) => list.filter((i) => i.id !== item.id));
     const { error } = await sb.from("album_items").insert(item);
     if (error) { setNotice("Không hoàn tác được: " + error.message); return; }
+    confirmed.current.set(item.id, item);
     setItems((list) => list.some((i) => i.id === item.id) ? list : [...list, item]);
   }
 
@@ -92,6 +102,7 @@ export function Scrapbook() {
       if (!alive) return;
       setOccasion((o.data as Occasion) ?? null);
       const list = (it.data as AlbumItem[]) ?? [];
+      confirmed.current = new Map(list.map((item) => [item.id, item]));
       setItems(list);
       setLoaded(true);
       resolveUrls(list);
@@ -102,10 +113,12 @@ export function Scrapbook() {
       .channel(`album:${id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "album_items", filter: `occasion_id=eq.${id}` }, (payload) => {
         if (payload.eventType === "DELETE") {
+          confirmed.current.delete((payload.old as AlbumItem).id);
           setItems((l) => l.filter((i) => i.id !== (payload.old as AlbumItem).id));
           return;
         }
         const row = payload.new as AlbumItem;
+        confirmed.current.set(row.id, row);
         if (gesture.current?.id === row.id) return; // đang kéo món này, bỏ qua
         setItems((l) => (l.some((i) => i.id === row.id) ? l.map((i) => (i.id === row.id ? row : i)) : [...l, row]));
         resolveUrls([row]);
@@ -132,31 +145,34 @@ export function Scrapbook() {
     setItems((l) => l.map((i) => (i.id === itemId ? { ...i, ...changes } : i)));
   }, []);
 
-  const persist = useCallback(
-    async (itemId: string, changes: Partial<AlbumItem>) => {
-      const { data, error } = await sb.from("album_items").update({ ...changes, updated_at: new Date().toISOString() }).eq("id", itemId).select().single();
-      if (error || !data) {
-        setNotice("Không lưu được: " + (error?.message ?? "Mục không còn tồn tại"));
-        const result = await sb.from("album_items").select("*").eq("occasion_id", id).order("z");
-        if (!result.error) setItems(result.data as AlbumItem[]);
-        else setNotice("Không tải lại được trang. Hãy tải lại trước khi sửa tiếp.");
-        return false;
+  async function persist(itemId: string, changes: Partial<AlbumItem>) {
+    const { data, error } = await sb.from("album_items").update({ ...changes, updated_at: new Date().toISOString() }).eq("id", itemId).select().single();
+    if (error || !data) {
+      const previous = confirmed.current.get(itemId);
+      if (previous) patch(itemId, previous);
+      setNotice("Không lưu được: " + (error?.message ?? "Mục không còn tồn tại"));
+      const result = await sb.from("album_items").select("*").eq("occasion_id", id).order("z");
+      if (!result.error) {
+        confirmed.current = new Map((result.data as AlbumItem[]).map((item) => [item.id, item]));
+        setItems(result.data as AlbumItem[]);
+      } else {
+        setEditing(false);
+        setNotice("Không tải lại được trang. Hãy tải lại trước khi sửa tiếp.");
       }
-      patch(itemId, data as AlbumItem);
-      return true;
-    },
-    [sb, id, patch],
-  );
+      return false;
+    }
+    confirmed.current.set(itemId, data as AlbumItem);
+    patch(itemId, data as AlbumItem);
+    return true;
+  }
 
   const maxZ = () => itemsRef.current.reduce((m, i) => Math.max(m, i.z), 0);
 
   async function addItem(partial: Partial<AlbumItem> & Pick<AlbumItem, "kind">) {
     const row = {
       occasion_id: id,
-      x: PAGE_W / 2 + (Math.random() - 0.5) * 200,
-      y: PAGE_H / 2 + (Math.random() - 0.5) * 300,
+      ...randomPlacement(),
       width: 400,
-      rotation: Math.round((Math.random() - 0.5) * 12),
       z: maxZ() + 1,
       style: {},
       ...partial,
@@ -167,6 +183,7 @@ export function Scrapbook() {
       return null;
     }
     const item = data as AlbumItem;
+    confirmed.current.set(item.id, item);
     setItems((l) => (l.some((i) => i.id === item.id) ? l : [...l, item]));
     setSelected(item.id);
     return item;
@@ -175,6 +192,7 @@ export function Scrapbook() {
   async function removeItem(item: AlbumItem) {
     const { data, error } = await sb.from("album_items").delete().eq("id", item.id).select("id").single();
     if (error || !data) return setNotice("Không xoá được: " + (error?.message ?? "Mục không còn tồn tại"));
+    confirmed.current.delete(item.id);
     setItems((l) => l.filter((i) => i.id !== item.id));
     setSelected(null);
     setDeleted((list) => [...list, item]);

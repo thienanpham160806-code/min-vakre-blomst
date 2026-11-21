@@ -16,6 +16,7 @@ const Ctx = createContext<State>({ status: "loading" });
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const left = useUnlock();
+  const locked = left === null || left > 0;
   const [state, setState] = useState<State>({ status: "loading" });
 
   useEffect(() => {
@@ -35,7 +36,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const me = (members ?? []).find((m) => m.user_id === auth.user!.id) as Member | undefined;
       if (!me || !settings) return setState({ status: "not-member", email: auth.user.email ?? null });
 
-      if (me.role !== "owner" && (left === null || left > 0)) {
+      if (me.role !== "owner" && locked) {
         return setState({ status: "locked", settings });
       }
       const partner = ((members ?? []).find((m) => m.user_id !== me.user_id) as Member) ?? null;
@@ -50,7 +51,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       sub.subscription.unsubscribe();
     };
-  }, [left === null || left > 0]);
+  }, [locked]);
 
   return <Ctx value={state}>{children}</Ctx>;
 }
