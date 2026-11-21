@@ -26,7 +26,7 @@ export type Occasion = {
   created_at: string;
 };
 
-export type ItemKind = "photo" | "video" | "sticker" | "text";
+export type ItemKind = "photo" | "video" | "sticker" | "text" | "drive";
 
 export type ItemStyle = {
   frame?: "polaroid" | "plain" | "tape" | "round";
@@ -42,6 +42,8 @@ export type AlbumItem = {
   occasion_id: string;
   kind: ItemKind;
   storage_path: string | null;
+  drive_url: string | null;
+  drive_name: string | null;
   content: string | null;
   x: number;
   y: number;

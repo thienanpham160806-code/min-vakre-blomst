@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { StickerView } from "@/components/stickers";
 import type { AlbumItem } from "@/lib/types";
+import { normalizeDriveUrl } from "@/lib/drive";
 
 export const FONT_CLASS = {
   hand: "font-hand",
@@ -14,6 +15,16 @@ export const FONT_CLASS = {
 /** Vẽ nội dung một món trên trang (không lo kéo thả). Kích thước theo đơn vị khung 1000px, nhân `scale`. */
 export function ItemView({ item, url, scale, editing }: { item: AlbumItem; url?: string; scale: number; editing: boolean }) {
   const w = item.width * scale;
+
+  if (item.kind === "drive") {
+    let href: string | null = null;
+    try { href = normalizeDriveUrl(item.drive_url ?? ""); } catch { /* Dữ liệu cũ không hợp lệ: không tạo link. */ }
+    return <div className="paper-card bg-white p-4 text-center" style={{ width: w, fontSize: 36 * scale }}>
+      <span aria-hidden="true">📁</span>
+      <p className="break-words font-semibold">{item.drive_name || "File Google Drive"}</p>
+      {!editing && href && <a className="mt-2 block underline" href={href} target="_blank" rel="noopener noreferrer">Mở trong Google Drive</a>}
+    </div>;
+  }
 
   if (item.kind === "text") {
     const size = (item.style.size ?? 56) * scale;

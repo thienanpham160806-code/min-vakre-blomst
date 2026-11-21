@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BUILTIN_STICKERS, EMOJI_STICKERS, StickerView } from "@/components/stickers";
 import { Label, Sheet } from "@/components/Sheet";
+import { normalizeDriveUrl } from "@/lib/drive";
 import { BACKGROUNDS } from "@/lib/backgrounds";
 import { formatDate } from "@/lib/format";
 import { MAX_VIDEO_MB, removeUnusedFiles, compressImage, signedUrls, uploadToBucket, videoAspect } from "@/lib/media";
@@ -36,8 +37,13 @@ export function Scrapbook() {
   const [loaded, setLoaded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<null | "sticker" | "text" | "background" | "info">(null);
+  const [sheet, setSheet] = useState<null | "sticker" | "text" | "background" | "info" | "drive">(null);
   const [textDraft, setTextDraft] = useState<{ id?: string; content: string; font: NonNullable<ItemStyle["font"]>; color: string }>({ content: "", font: "hand", color: TEXT_COLORS[0] });
+  const [driveUrl, setDriveUrl] = useState("");
+  const [driveName, setDriveName] = useState("");
+  const [driveError, setDriveError] = useState("");
+  const [driveBusy, setDriveBusy] = useState(false);
+  const [largeVideo, setLargeVideo] = useState<string | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
 
   const [notice, setNotice] = useState("");
@@ -198,7 +204,7 @@ export function Scrapbook() {
       try {
         if (f.type.startsWith("video/")) {
           if (f.size > MAX_VIDEO_MB * 1024 * 1024) {
-            alert(`Video "${f.name}" nặng quá ${MAX_VIDEO_MB}MB, nén lại rồi up nha.`);
+            setLargeVideo(f.name);
             continue;
           }
           const aspect = await videoAspect(f);
@@ -506,6 +512,7 @@ export function Scrapbook() {
               <span className="text-2xl">📷</span>Ảnh/Video
               <input type="file" accept="image/*,video/*" multiple className="hidden" onChange={(e) => { onFiles(e.target.files); e.target.value = ""; }} />
             </label>
+            <Tool icon="📁" label="Drive" onClick={() => { setDriveUrl(""); setDriveName(""); setDriveError(""); setSheet("drive"); }} />
             <Tool icon="🌸" label="Sticker" onClick={() => setSheet("sticker")} />
             <Tool icon="✍️" label="Chữ" onClick={() => { setTextDraft({ content: "", font: "hand", color: TEXT_COLORS[0] }); setSheet("text"); }} />
             <Tool icon="🎨" label="Nền" onClick={() => setSheet("background")} />
@@ -514,6 +521,32 @@ export function Scrapbook() {
         </div>
       )}
 
+      {largeVideo && <div role="status" className="fixed inset-x-3 bottom-24 z-40 paper-card p-4">
+        <p>Video “{largeVideo}” vượt {MAX_VIDEO_MB}MB.</p>
+        <button className="btn btn-primary" onClick={() => { setDriveName(largeVideo); setDriveUrl(""); setDriveError(""); setLargeVideo(null); setSheet("drive"); }}>Gắn từ Google Drive</button>
+        <button className="btn btn-ghost" onClick={() => setLargeVideo(null)}>Đóng</button>
+      </div>}
+      <Sheet open={sheet === "drive"} onClose={() => setSheet(null)} title="Gắn file Google Drive">
+        <form className="space-y-4" onSubmit={async (e) => {
+          e.preventDefault();
+          if (driveBusy) return;
+          let normalized: string;
+          try { normalized = normalizeDriveUrl(driveUrl); } catch (error) { setDriveError((error as Error).message); return; }
+          setDriveBusy(true);
+          try {
+            if (await addItem({ kind: "drive", drive_url: normalized, drive_name: driveName.trim() || "File Google Drive", width: 460 })) setSheet(null);
+          } finally { setDriveBusy(false); }
+        }}>
+          <label className="block"><Label>Liên kết Google Drive</Label><input className="field" value={driveUrl} onChange={(e) => {
+            setDriveUrl(e.target.value);
+            try { normalizeDriveUrl(e.target.value); setDriveError(""); } catch (error) { setDriveError((error as Error).message); }
+          }} required /></label>
+          <label className="block"><Label>Tên hiển thị</Label><input className="field" value={driveName} onChange={(e) => setDriveName(e.target.value)} /></label>
+          <p className="text-sm text-ink-soft">Giữ quyền chia sẻ ở chế độ Bị hạn chế và thêm đúng email Google của người kia. Đừng đặt Bất kỳ ai có đường liên kết.</p>
+          {driveError && <p role="alert" className="text-blush-deep">{driveError}</p>}
+          <button className="btn btn-primary w-full" disabled={driveBusy}>{driveBusy ? "Đang gắn…" : "Gắn vào album"}</button>
+        </form>
+      </Sheet>
       {/* Chọn sticker */}
       <Sheet open={sheet === "sticker"} onClose={() => setSheet(null)} title="Sticker">
         <div className="grid grid-cols-4 gap-3">
