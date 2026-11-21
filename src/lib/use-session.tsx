@@ -28,7 +28,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
       const [{ data: members }, { data: settings }] = await Promise.all([
         sb.from("members").select("user_id, display_name, role, email"),
-        sb.from("settings").select("unlock_at, together_since").eq("id", 1).maybeSingle(),
+        sb.from("settings").select("unlock_at, together_since, finale_occasion_id").eq("id", 1).maybeSingle(),
       ]);
       if (cancelled) return;
 

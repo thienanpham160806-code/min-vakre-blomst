@@ -10,6 +10,7 @@ export type Member = {
 export type Settings = {
   unlock_at: string;
   together_since: string | null;
+  finale_occasion_id: string | null;
 };
 
 export type FlowerKind = "tulip" | "daisy" | "rose" | "sunflower" | "lavender";

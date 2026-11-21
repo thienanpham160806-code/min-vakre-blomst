@@ -7,7 +7,7 @@ import { Label } from "@/components/Sheet";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { formatDateTime, localInputToIso } from "@/lib/format";
 import { useReady } from "@/lib/use-session";
-import type { Invitation, InvitationOption, ScheduledMail } from "@/lib/types";
+import type { Invitation, InvitationOption, ScheduledMail, Occasion } from "@/lib/types";
 
 /** Ngày giờ ISO → giá trị cho <input type="datetime-local"> theo giờ VN */
 function toLocalInput(iso: string | null) {
@@ -30,7 +30,7 @@ export function OwnerSettings() {
     <>
       <PageHeader title="Cài đặt" subtitle="Chỉ mình bro thấy trang này" right={<SignOut />} />
       <div className="mx-auto max-w-2xl space-y-6 px-5 pb-10">
-        <General unlockAt={settings.unlock_at} togetherSince={settings.together_since} />
+        <General unlockAt={settings.unlock_at} togetherSince={settings.together_since} finaleId={settings.finale_occasion_id} />
         <BirthdayInvite />
         <Mails defaultTo={partner?.email ?? ""} />
         <Link href="/qua" className="btn btn-ghost w-full">👀 Xem trước màn mở quà</Link>
@@ -48,7 +48,15 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-function General({ unlockAt, togetherSince }: { unlockAt: string; togetherSince: string | null }) {
+function General({ unlockAt, togetherSince, finaleId }: { unlockAt: string; togetherSince: string | null; finaleId: string | null }) {
+  const [finale, setFinale] = useState(finaleId ?? "");
+  const [albums, setAlbums] = useState<Occasion[]>([]);
+  useEffect(() => {
+    supabaseBrowser().from("occasions").select("*").order("happened_on").then(({ data, error }) => {
+      if (error) setErr(error.message);
+      else setAlbums(data as Occasion[]);
+    });
+  }, []);
   const [unlock, setUnlock] = useState(toLocalInput(unlockAt));
   const [since, setSince] = useState(togetherSince ?? "");
   const [saved, setSaved] = useState(false);
@@ -60,6 +68,12 @@ function General({ unlockAt, togetherSince }: { unlockAt: string; togetherSince:
         <Label>Giờ mở khoá cho ẻm (giờ VN)</Label>
         <input className="field" type="datetime-local" value={unlock} onChange={(e) => setUnlock(e.target.value)} />
         <span className="mt-1 block text-xs text-ink-soft">Giờ mới tự đồng bộ, không cần deploy lại.</span>
+      </label>
+      <label className="block"><Label>Bông hoa ở màn kết</Label>
+        <select className="field" value={finale} onChange={(e) => setFinale(e.target.value)}>
+          <option value="">Không chọn</option>
+          {albums.map((album) => <option key={album.id} value={album.id}>{album.title}</option>)}
+        </select>
       </label>
       <label className="block">
         <Label>Ngày bắt đầu yêu nhau</Label>
@@ -73,7 +87,7 @@ function General({ unlockAt, togetherSince }: { unlockAt: string; togetherSince:
           setErr("");
           const { data, error } = await supabaseBrowser()
             .from("settings")
-            .update({ unlock_at: localInputToIso(unlock), together_since: since || null, updated_at: new Date().toISOString() })
+            .update({ finale_occasion_id: finale || null, unlock_at: localInputToIso(unlock), together_since: since || null, updated_at: new Date().toISOString() })
             .eq("id", 1).select("id").single();
           if (error || !data) return setErr(error?.message ?? "Không lưu được cài đặt");
           setSaved(true);

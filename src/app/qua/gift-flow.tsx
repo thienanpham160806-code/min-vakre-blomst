@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { formatDateTime } from "@/lib/format";
@@ -10,7 +10,11 @@ import type { Invitation, Letter } from "@/lib/types";
 type Step = "envelope" | "letter" | "invite" | "done";
 
 export function GiftFlow() {
-  const { me } = useReady();
+  const { me, settings } = useReady();
+  const router = useRouter();
+  const [replay, setReplay] = useState(false);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
   const [letter, setLetter] = useState<Letter | null>(null);
   const [invite, setInvite] = useState<Invitation | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -18,11 +22,13 @@ export function GiftFlow() {
   const [opening, setOpening] = useState(false);
 
   useEffect(() => {
+    setReplay(new URLSearchParams(window.location.search).get("replay") === "1");
     const sb = supabaseBrowser();
     Promise.all([
       sb.from("letters").select("*").eq("is_birthday", true).order("created_at", { ascending: false }).limit(1).maybeSingle(),
       sb.from("invitations").select("*").eq("is_birthday", true).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     ]).then(([l, i]) => {
+      if (l.error || i.error) { setErr("Không tải được quà. Hãy thử tải lại trang."); return; }
       setLetter((l.data as Letter) ?? null);
       setInvite((i.data as Invitation) ?? null);
       setLoaded(true);
@@ -35,6 +41,7 @@ export function GiftFlow() {
     if (empty) window.location.replace("/vuon");
   }, [empty]);
 
+  if (err && !loaded) return <p role="alert" className="p-8">{err}</p>;
   if (!loaded || empty) return <div className="flex min-h-dvh items-center justify-center text-3xl">🎁</div>;
 
   const next = (from: Step): Step => {
@@ -45,6 +52,8 @@ export function GiftFlow() {
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-blush px-5 py-10">
+      {err && <p role="alert" className="paper-card p-3">{err}</p>}
+      {replay && <p className="mb-4">Xem lại quà · Chỉ đọc</p>}
       {me.role === "owner" && (
         <p className="mb-4 rounded-full bg-white/70 px-3 py-1 text-xs">Bản xem trước của bro, ẻm sẽ thấy y vậy</p>
       )}
@@ -78,13 +87,22 @@ export function GiftFlow() {
         </article>
       )}
 
-      {step === "invite" && invite && <InviteCard invite={invite} onDone={() => setStep("done")} onAnswered={setInvite} />}
+      {step === "invite" && invite && <InviteCard preview={me.role === "owner"} readOnly={replay} invite={invite} onDone={() => setStep("done")} onAnswered={setInvite} />}
 
       {step === "done" && (
         <div className="flex flex-col items-center gap-5 text-center animate-pop">
           <p className="font-script text-4xl">Chúc mừng sinh nhật 🌷</p>
           <p className="max-w-xs font-hand text-xl">Khu vườn của tụi mình bắt đầu từ hôm nay. Mỗi kỷ niệm sẽ là một bông hoa.</p>
-          <Link href="/vuon" className="btn btn-primary text-lg">Vào vườn</Link>
+          <button className="btn btn-primary text-lg" disabled={busy} onClick={async () => {
+            if (busy) return;
+            setBusy(true);
+            setErr("");
+            if (me.role === "partner" && !replay) {
+              const { error } = await supabaseBrowser().from("gift_progress").upsert({ user_id: me.user_id, completed_at: new Date().toISOString() });
+              if (error) { setBusy(false); setErr("Không lưu được tiến độ: " + error.message); return; }
+            }
+            router.push(settings.finale_occasion_id ? `/album/${settings.finale_occasion_id}` : "/vuon");
+          }}>{settings.finale_occasion_id ? "Xem bông hoa đầu tiên" : "Vào vườn"}</button>
         </div>
       )}
     </div>
@@ -95,23 +113,30 @@ function InviteCard({
   invite,
   onDone,
   onAnswered,
+  preview,
+  readOnly,
 }: {
   invite: Invitation;
+  preview: boolean;
+  readOnly: boolean;
   onDone: () => void;
   onAnswered: (i: Invitation) => void;
 }) {
   const [busy, setBusy] = useState(false);
-
-  async function choose(idx: number) {
+  const [chosen, setChosen] = useState(invite.chosen);
+  const [err, setErr] = useState("");
+  async function accept() {
+    if (busy) return;
+    if (preview || readOnly || invite.answered_at) { onDone(); return; }
     setBusy(true);
-    const { data } = await supabaseBrowser()
-      .from("invitations")
-      .update({ chosen: idx, answered_at: new Date().toISOString() })
-      .eq("id", invite.id)
-      .select()
-      .single();
+    setErr("");
+    const { data, error } = await supabaseBrowser().from("invitations")
+      .update({ chosen, answered_at: new Date().toISOString() }).eq("id", invite.id)
+      .is("answered_at", null).select().single();
     setBusy(false);
-    if (data) onAnswered(data as Invitation);
+    if (error || !data) { setErr("Không lưu được lời nhận: " + (error?.message ?? "Hãy tải lại thiệp")); return; }
+    onAnswered(data as Invitation);
+    onDone();
   }
 
   return (
@@ -129,15 +154,15 @@ function InviteCard({
 
         {invite.options.length > 0 && (
           <div className="pt-2">
-            <p className="mb-2 font-semibold">{invite.chosen === null ? "Chọn chỗ ăn nha:" : "Đã chốt:"}</p>
+            <p className="mb-2 font-semibold">{!invite.answered_at ? "Chọn chỗ ăn nha:" : "Đã chốt:"}</p>
             <div className="grid gap-2">
               {invite.options.map((o, i) => {
-                const picked = invite.chosen === i;
+                const picked = chosen === i;
                 return (
                   <button
                     key={i}
-                    disabled={busy}
-                    onClick={() => choose(i)}
+                    disabled={busy || readOnly || (!preview && !!invite.answered_at)}
+                    onClick={() => setChosen(i)}
                     className={`flex items-center gap-3 rounded-2xl border-2 p-3 text-left transition ${picked ? "border-blush-deep bg-blush/30" : "border-ink/10"}`}
                   >
                     <span className="text-3xl">{o.emoji ?? "🍽️"}</span>
@@ -154,8 +179,9 @@ function InviteCard({
         )}
 
         <div className="pt-3 text-right">
-          <button className="btn btn-primary" disabled={invite.options.length > 0 && invite.chosen === null} onClick={onDone}>
-            Nhận lời 💌
+          {err && <p role="alert" className="text-blush-deep">{err}</p>}
+          <button className="btn btn-primary" disabled={busy || (!readOnly && invite.options.length > 0 && chosen === null)} onClick={accept}>
+            {readOnly || invite.answered_at ? "Tiếp nè →" : "Nhận lời 💌"}
           </button>
         </div>
       </div>

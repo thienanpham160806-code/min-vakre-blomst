@@ -39,6 +39,7 @@ export function Garden() {
         right={<button className="btn btn-primary" onClick={() => setAdding(true)}>+ Trồng hoa</button>}
       />
 
+      <div className="mx-auto max-w-2xl px-5 pb-3"><Link href="/qua?replay=1" className="text-sm underline text-ink-soft">Mở lại quà sinh nhật 🎁</Link></div>
       <section className="relative mx-auto min-h-[60dvh] max-w-2xl overflow-hidden rounded-t-[40px] bg-gradient-to-b from-[#eaf4e6] to-[#cfe3c7] px-3 pt-8">
         {occasions === null ? (
           <p className="py-20 text-center text-3xl">🌱</p>

@@ -24,7 +24,9 @@ export default function LoginPage() {
     }
     setBusy(false);
     if (error) return setError("Sai rồi, thử nhớ lại xem 🥺");
-    router.replace("/qua");
+    const { data: auth } = await sb.auth.getUser();
+    const { data: progress } = await sb.from("gift_progress").select("completed_at").eq("user_id", auth.user!.id).maybeSingle();
+    router.replace(progress ? "/vuon" : "/qua");
   }
 
   return (
