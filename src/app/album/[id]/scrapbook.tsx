@@ -7,7 +7,7 @@ import { BUILTIN_STICKERS, EMOJI_STICKERS, StickerView } from "@/components/stic
 import { Label, Sheet } from "@/components/Sheet";
 import { BACKGROUNDS } from "@/lib/backgrounds";
 import { formatDate } from "@/lib/format";
-import { MAX_VIDEO_MB, BUCKET, compressImage, signedUrls, uploadToBucket, videoAspect } from "@/lib/media";
+import { MAX_VIDEO_MB, removeUnusedFiles, compressImage, signedUrls, uploadToBucket, videoAspect } from "@/lib/media";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import type { AlbumItem, Background, ItemStyle, Occasion } from "@/lib/types";
 import { FONT_CLASS, ItemView } from "./item-view";
@@ -39,6 +39,25 @@ export function Scrapbook() {
   const [sheet, setSheet] = useState<null | "sticker" | "text" | "background" | "info">(null);
   const [textDraft, setTextDraft] = useState<{ id?: string; content: string; font: NonNullable<ItemStyle["font"]>; color: string }>({ content: "", font: "hand", color: TEXT_COLORS[0] });
   const [uploading, setUploading] = useState<string | null>(null);
+
+  const [notice, setNotice] = useState("");
+  const [deleted, setDeleted] = useState<AlbumItem[]>([]);
+  const pendingDeletes = useRef(new Map<string, { item: AlbumItem; timer: ReturnType<typeof setTimeout> }>());
+  useEffect(() => {
+    const pending = pendingDeletes.current;
+    return () => { for (const entry of pending.values()) clearTimeout(entry.timer); };
+  }, []);
+
+  async function undo(item: AlbumItem) {
+    const entry = pendingDeletes.current.get(item.id);
+    if (!entry) return;
+    clearTimeout(entry.timer);
+    pendingDeletes.current.delete(item.id);
+    setDeleted((list) => list.filter((i) => i.id !== item.id));
+    const { error } = await sb.from("album_items").insert(item);
+    if (error) { setNotice("Không hoàn tác được: " + error.message); return; }
+    setItems((list) => list.some((i) => i.id === item.id) ? list : [...list, item]);
+  }
 
   const stageRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.36);
@@ -109,9 +128,18 @@ export function Scrapbook() {
 
   const persist = useCallback(
     async (itemId: string, changes: Partial<AlbumItem>) => {
-      await sb.from("album_items").update({ ...changes, updated_at: new Date().toISOString() }).eq("id", itemId);
+      const { data, error } = await sb.from("album_items").update({ ...changes, updated_at: new Date().toISOString() }).eq("id", itemId).select().single();
+      if (error || !data) {
+        setNotice("Không lưu được: " + (error?.message ?? "Mục không còn tồn tại"));
+        const result = await sb.from("album_items").select("*").eq("occasion_id", id).order("z");
+        if (!result.error) setItems(result.data as AlbumItem[]);
+        else setNotice("Không tải lại được trang. Hãy tải lại trước khi sửa tiếp.");
+        return false;
+      }
+      patch(itemId, data as AlbumItem);
+      return true;
     },
-    [sb],
+    [sb, id, patch],
   );
 
   const maxZ = () => itemsRef.current.reduce((m, i) => Math.max(m, i.z), 0);
@@ -139,10 +167,19 @@ export function Scrapbook() {
   }
 
   async function removeItem(item: AlbumItem) {
+    const { data, error } = await sb.from("album_items").delete().eq("id", item.id).select("id").single();
+    if (error || !data) return setNotice("Không xoá được: " + (error?.message ?? "Mục không còn tồn tại"));
     setItems((l) => l.filter((i) => i.id !== item.id));
     setSelected(null);
-    await sb.from("album_items").delete().eq("id", item.id);
-    if (item.storage_path) await sb.storage.from(BUCKET).remove([item.storage_path]);
+    setDeleted((list) => [...list, item]);
+    const timer = setTimeout(async () => {
+      pendingDeletes.current.delete(item.id);
+      setDeleted((list) => list.filter((i) => i.id !== item.id));
+      if (item.storage_path && ![...pendingDeletes.current.values()].some((p) => p.item.storage_path === item.storage_path)) {
+        await removeUnusedFiles([item.storage_path]);
+      }
+    }, 6000);
+    pendingDeletes.current.set(item.id, { item, timer });
   }
 
   async function duplicate(item: AlbumItem) {
@@ -314,10 +351,10 @@ export function Scrapbook() {
       if (item) {
         const style = { ...item.style, font: textDraft.font, color: textDraft.color };
         patch(item.id, { content, style });
-        await persist(item.id, { content, style });
+        if (!await persist(item.id, { content, style })) return;
       }
     } else {
-      await addItem({ kind: "text", content, width: 600, rotation: 0, style: { font: textDraft.font, color: textDraft.color, size: 64 } });
+      if (!await addItem({ kind: "text", content, width: 600, rotation: 0, style: { font: textDraft.font, color: textDraft.color, size: 64 } })) return;
     }
     setSheet(null);
   }
@@ -336,6 +373,10 @@ export function Scrapbook() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-paper">
+      <div className="fixed inset-x-3 top-16 z-50 space-y-2" aria-live="polite">
+        {notice && <p role="alert" className="paper-card p-3">{notice} <button onClick={() => setNotice("")}>Đóng</button></p>}
+        {deleted.map((item) => <div key={item.id} className="paper-card p-3">Đã xoá · <button className="underline" onClick={() => undo(item)}>Hoàn tác</button></div>)}
+      </div>
       {/* Đầu trang */}
       <header className="sticky top-0 z-30 flex items-center gap-2 bg-paper/90 px-3 py-2 backdrop-blur">
         <Link href="/vuon" className="btn btn-ghost px-3 py-2" aria-label="Về vườn">←</Link>
@@ -533,9 +574,11 @@ export function Scrapbook() {
               key={b.value}
               className="flex flex-col items-center gap-1 text-sm"
               onClick={async () => {
+                const previous = occasion;
                 setOccasion({ ...occasion, background: b.value as Background });
                 setSheet(null);
-                await sb.from("occasions").update({ background: b.value }).eq("id", occasion.id);
+                const { error } = await sb.from("occasions").update({ background: b.value }).eq("id", occasion.id).select("id").single();
+                if (error) { setOccasion(previous); setNotice("Không đổi được nền: " + error.message); }
               }}
             >
               <span className={`bg-${b.value} aspect-[5/7] w-full rounded-xl border-2 ${occasion.background === b.value ? "border-blush-deep" : "border-ink/10"}`} />
@@ -584,7 +627,8 @@ function InfoSheet({
           className="btn btn-primary w-full"
           onClick={async () => {
             const changes = { title: title.trim() || occasion.title, happened_on: date, description: desc.trim() || null };
-            await sb.from("occasions").update(changes).eq("id", occasion.id);
+            const { error } = await sb.from("occasions").update(changes).eq("id", occasion.id).select("id").single();
+            if (error) return alert("Không lưu được: " + error.message);
             onSaved({ ...occasion, ...changes });
             onClose();
           }}
@@ -595,10 +639,11 @@ function InfoSheet({
           className="btn btn-ghost w-full text-blush-deep"
           onClick={async () => {
             if (!confirm("Xoá cả trang này và mọi ảnh trong đó?")) return;
-            const { data } = await sb.from("album_items").select("storage_path").eq("occasion_id", occasion.id);
+            const { data, error: readError } = await sb.from("album_items").select("storage_path").eq("occasion_id", occasion.id);
             const paths = (data ?? []).map((r) => r.storage_path).filter(Boolean) as string[];
-            if (paths.length) await sb.storage.from(BUCKET).remove(paths);
-            await sb.from("occasions").delete().eq("id", occasion.id);
+            const { error } = await sb.from("occasions").delete().eq("id", occasion.id).select("id").single();
+            if (error) return alert("Không xoá được: " + error.message);
+            if (!readError) await removeUnusedFiles(paths);
             onDeleted();
           }}
         >

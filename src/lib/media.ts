@@ -6,6 +6,20 @@ export const BUCKET = "memories";
 /** Giới hạn mặc định của Supabase gói miễn phí là 50MB/tệp. */
 export const MAX_VIDEO_MB = 50;
 
+/** Khi không xác nhận được quyền đọc toàn bộ tham chiếu thì giữ file. */
+export async function removeUnusedFiles(paths: string[]) {
+  const sb = supabaseBrowser();
+  const { data: allowed, error: accessError } = await sb.rpc("can_view");
+  if (accessError || allowed !== true) return;
+  for (const path of new Set(paths)) {
+    const { count, error } = await sb.from("album_items").select("id", { count: "exact", head: true }).eq("storage_path", path);
+    if (!error && count === 0) {
+      // Lỗi dọn file không ảnh hưởng dữ liệu; giữ file để có thể dọn lại sau.
+      await sb.storage.from(BUCKET).remove([path]);
+    }
+  }
+}
+
 const urlCache = new Map<string, { url: string; exp: number }>();
 
 /** Lấy signed URL cho nhiều tệp một lúc (bucket riêng tư). Cache 50 phút. */
