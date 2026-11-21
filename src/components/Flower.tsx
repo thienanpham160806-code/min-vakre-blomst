@@ -13,12 +13,13 @@ export function Flower({
   stem?: number;
 }) {
   const top = 200 - stem;
+  const drawHead = Object.hasOwn(HEADS, kind) ? HEADS[kind] : HEADS.tulip;
   return (
     <svg viewBox="0 0 100 200" className={className} aria-hidden>
       <path d={`M50 200 C 46 ${top + stem * 0.6}, 54 ${top + stem * 0.3}, 50 ${top + 20}`} stroke="#6f9a6b" strokeWidth="4" fill="none" strokeLinecap="round" />
       <path d={`M50 ${top + stem * 0.62} q -22 -6 -30 -22 q 20 0 30 18`} fill="#8fb98a" />
       <path d={`M50 ${top + stem * 0.45} q 22 -4 28 -20 q -20 2 -28 16`} fill="#9cc596" />
-      <g transform={`translate(50 ${top + 10})`}>{HEADS[kind](color)}</g>
+      <g transform={`translate(50 ${top + 10})`}>{drawHead(color)}</g>
     </svg>
   );
 }
