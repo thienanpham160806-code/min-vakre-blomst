@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useUnlock } from "@/lib/use-unlock";
 import { Flower } from "@/components/Flower";
 
-const UNLOCK_AT = new Date(process.env.NEXT_PUBLIC_UNLOCK_AT ?? "2027-01-18T00:00:00+07:00").getTime();
+
 
 function parts(ms: number) {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -17,21 +17,8 @@ function parts(ms: number) {
 }
 
 export function Countdown() {
-  const [now, setNow] = useState<number | null>(null);
-
-  useEffect(() => {
-    // setState trong callback để giờ chỉ tính ở trình duyệt (tránh lệch khi render sẵn)
-    const tick = () => setNow(Date.now());
-    const first = setTimeout(tick, 0);
-    const t = setInterval(tick, 1000);
-    return () => {
-      clearTimeout(first);
-      clearInterval(t);
-    };
-  }, []);
-
-  if (now === null) return null;
-  const left = UNLOCK_AT - now;
+  const left = useUnlock();
+  if (left === null) return <p>Đang đồng bộ giờ mở quà…</p>;
   const opened = left <= 0;
 
   return (

@@ -52,25 +52,30 @@ function General({ unlockAt, togetherSince }: { unlockAt: string; togetherSince:
   const [unlock, setUnlock] = useState(toLocalInput(unlockAt));
   const [since, setSince] = useState(togetherSince ?? "");
   const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState("");
 
   return (
     <Card title="Chung">
       <label className="block">
         <Label>Giờ mở khoá cho ẻm (giờ VN)</Label>
         <input className="field" type="datetime-local" value={unlock} onChange={(e) => setUnlock(e.target.value)} />
-        <span className="mt-1 block text-xs text-ink-soft">Nhớ sửa luôn NEXT_PUBLIC_UNLOCK_AT nếu đổi giờ, để đồng hồ đếm ngược khớp.</span>
+        <span className="mt-1 block text-xs text-ink-soft">Giờ mới tự đồng bộ, không cần deploy lại.</span>
       </label>
       <label className="block">
         <Label>Ngày bắt đầu yêu nhau</Label>
         <input className="field" type="date" value={since} onChange={(e) => setSince(e.target.value)} />
       </label>
+      {err && <p role="alert" className="text-blush-deep">{err}</p>}
       <button
         className="btn btn-primary"
         onClick={async () => {
-          await supabaseBrowser()
+          setSaved(false);
+          setErr("");
+          const { data, error } = await supabaseBrowser()
             .from("settings")
             .update({ unlock_at: localInputToIso(unlock), together_since: since || null, updated_at: new Date().toISOString() })
-            .eq("id", 1);
+            .eq("id", 1).select("id").single();
+          if (error || !data) return setErr(error?.message ?? "Không lưu được cài đặt");
           setSaved(true);
           setTimeout(() => setSaved(false), 2000);
         }}
@@ -91,6 +96,7 @@ function BirthdayInvite() {
   const [dress, setDress] = useState("");
   const [options, setOptions] = useState<InvitationOption[]>([{ emoji: "🍣", name: "" }, { emoji: "🍝", name: "" }, { emoji: "🍲", name: "" }]);
   const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState("");
 
   useEffect(() => {
     sb.from("invitations").select("*").eq("is_birthday", true).order("created_at", { ascending: false }).limit(1).maybeSingle().then(({ data }) => {
@@ -118,10 +124,13 @@ function BirthdayInvite() {
       options: options.filter((o) => o.name.trim()),
       is_birthday: true,
     };
-    const { data } = inv
+    setSaved(false);
+    setErr("");
+    const { data, error } = inv
       ? await sb.from("invitations").update(row).eq("id", inv.id).select().single()
       : await sb.from("invitations").insert(row).select().single();
-    if (data) setInv(data as Invitation);
+    if (error || !data) return setErr(error?.message ?? "Không lưu được thiệp");
+    setInv(data as Invitation);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -152,6 +161,7 @@ function BirthdayInvite() {
           <button className="text-sm text-blush-deep" onClick={() => setOptions((l) => [...l, { emoji: "✨", name: "" }])}>+ thêm lựa chọn</button>
         </div>
       </div>
+      {err && <p role="alert" className="text-blush-deep">{err}</p>}
       <button className="btn btn-primary" onClick={save}>{saved ? "Đã lưu ✓" : "Lưu thiệp"}</button>
       <p className="text-xs text-ink-soft">Lá thư sinh nhật: viết ở mục Thư, tick “Dùng làm thư trong màn mở quà sinh nhật” và hẹn giờ mở 18/01 00:00.</p>
     </Card>
@@ -160,6 +170,7 @@ function BirthdayInvite() {
 
 function Mails({ defaultTo }: { defaultTo: string }) {
   const sb = supabaseBrowser();
+  const [err, setErr] = useState("");
   const [mails, setMails] = useState<ScheduledMail[]>([]);
   const [to, setTo] = useState(defaultTo);
   const [subject, setSubject] = useState("min vakre blomst");
@@ -177,6 +188,7 @@ function Mails({ defaultTo }: { defaultTo: string }) {
 
   return (
     <Card title="Mail hẹn giờ">
+      {err && <p role="alert" className="text-blush-deep">{err}</p>}
       <ul className="space-y-2">
         {mails.length === 0 && <li className="text-sm text-ink-soft">Chưa hẹn mail nào.</li>}
         {mails.map((m) => (
@@ -187,7 +199,7 @@ function Mails({ defaultTo }: { defaultTo: string }) {
               <p className="text-ink-soft">{m.to_email} · {formatDateTime(m.send_at)}</p>
               {m.last_error && !m.sent_at && <p className="text-blush-deep">{m.last_error}</p>}
             </div>
-            {!m.sent_at && <button className="text-xs text-ink-soft" onClick={async () => { await sb.from("scheduled_mails").delete().eq("id", m.id); load(); }}>xoá</button>}
+            {!m.sent_at && <button className="text-xs text-ink-soft" onClick={async () => { const { error } = await sb.from("scheduled_mails").delete().eq("id", m.id); if (error) return setErr(error.message); setErr(""); load(); }}>xoá</button>}
           </li>
         ))}
       </ul>
@@ -201,7 +213,9 @@ function Mails({ defaultTo }: { defaultTo: string }) {
           className="btn btn-primary"
           onClick={async () => {
             if (!to || !body) return;
-            await sb.from("scheduled_mails").insert({ to_email: to, subject, heading: heading || null, body, send_at: localInputToIso(sendAt) });
+            const { error } = await sb.from("scheduled_mails").insert({ to_email: to, subject, heading: heading || null, body, send_at: localInputToIso(sendAt) });
+            if (error) return setErr(error.message);
+            setErr("");
             setBody("");
             setHeading("");
             load();

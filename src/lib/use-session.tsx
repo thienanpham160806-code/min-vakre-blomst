@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabaseBrowser } from "./supabase/client";
+import { useUnlock } from "./use-unlock";
 import type { Member, Settings } from "./types";
 
 type State =
@@ -14,6 +15,7 @@ type State =
 const Ctx = createContext<State>({ status: "loading" });
 
 export function SessionProvider({ children }: { children: ReactNode }) {
+  const left = useUnlock();
   const [state, setState] = useState<State>({ status: "loading" });
 
   useEffect(() => {
@@ -33,7 +35,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const me = (members ?? []).find((m) => m.user_id === auth.user!.id) as Member | undefined;
       if (!me || !settings) return setState({ status: "not-member", email: auth.user.email ?? null });
 
-      if (me.role !== "owner" && Date.now() < new Date(settings.unlock_at).getTime()) {
+      if (me.role !== "owner" && (left === null || left > 0)) {
         return setState({ status: "locked", settings });
       }
       const partner = ((members ?? []).find((m) => m.user_id !== me.user_id) as Member) ?? null;
@@ -48,7 +50,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       sub.subscription.unsubscribe();
     };
-  }, []);
+  }, [left === null || left > 0]);
 
   return <Ctx value={state}>{children}</Ctx>;
 }
