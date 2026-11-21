@@ -13,8 +13,45 @@ export type Settings = {
   finale_occasion_id: string | null;
 };
 
-export type FlowerKind = "tulip" | "daisy" | "rose" | "sunflower" | "lavender";
-export type Background = "kraft" | "grid" | "dots" | "blush" | "night";
+export type ThemeId =
+  | "ivory"
+  | "morning"
+  | "terracotta"
+  | "rain"
+  | "lavender"
+  | "night";
+
+export type FlowerKind =
+  | "tulip"
+  | "daisy"
+  | "rose"
+  | "sunflower"
+  | "lavender"
+  | "peony"
+  | "camellia"
+  | "poppy";
+
+export type Background =
+  | "ivory"
+  | "kraft"
+  | "grid"
+  | "dots"
+  | "lined"
+  | "torn"
+  | "botanical"
+  | "sage"
+  | "blush"
+  | "linen"
+  | "gingham"
+  | "night";
+
+export type FrameKind =
+  | "polaroid"
+  | "plain"
+  | "tape"
+  | "round"
+  | "film"
+  | "paper";
 
 export type Occasion = {
   id: string;
@@ -30,7 +67,7 @@ export type Occasion = {
 export type ItemKind = "photo" | "video" | "sticker" | "text" | "drive";
 
 export type ItemStyle = {
-  frame?: "polaroid" | "plain" | "tape" | "round";
+  frame?: FrameKind;
   caption?: string;
   font?: "hand" | "script" | "round" | "sans";
   color?: string;
