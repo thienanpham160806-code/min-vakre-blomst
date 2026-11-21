@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/AppShell";
 import { Flower } from "@/components/Flower";
 import { NewOccasion } from "@/components/NewOccasion";
+import { Sprout } from "@/components/icons";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { daysSince, formatDate, hash } from "@/lib/format";
 import { useReady } from "@/lib/use-session";
@@ -37,13 +38,16 @@ export function Garden() {
         right={<button className="btn btn-primary" onClick={() => setAdding(true)}>+ Trồng hoa</button>}
       />
 
-      <div className="mx-auto max-w-2xl px-5 pb-3"><Link href="/qua?replay=1" className="text-sm underline text-ink-soft">Mở lại quà sinh nhật 🎁</Link></div>
+      <div className="mx-auto -mt-2 max-w-2xl px-5 pb-4"><Link href="/qua?replay=1" className="text-sm text-ink-soft underline decoration-ink/25 hover:text-ink hover:decoration-ink/60">Mở lại quà sinh nhật</Link></div>
       <section className="relative mx-auto min-h-[60dvh] max-w-2xl overflow-hidden rounded-t-[40px] bg-gradient-to-b from-[#eaf4e6] to-[#cfe3c7] px-3 pt-8">
         {occasions === null ? (
-          <p className="py-20 text-center text-3xl">🌱</p>
+          <div className="flex justify-center py-20"><Sprout className="h-12 w-12" /></div>
         ) : occasions.length === 0 ? (
-          <div className="py-16 text-center">
-            <p className="font-hand text-xl text-ink-soft">Vườn còn trống. Trồng bông hoa đầu tiên nha.</p>
+          <div className="flex flex-col items-center px-6 pt-14 pb-24 text-center">
+            <Sprout className="h-20 w-20" />
+            <p className="mt-3 font-hand text-xl text-ink">Vườn còn trống.</p>
+            <p className="mt-1 max-w-[16rem] font-hand text-lg text-ink-soft">Mỗi dịp tụi mình có nhau sẽ mọc thành một bông hoa ở đây.</p>
+            <button className="btn btn-primary mt-6" onClick={() => setAdding(true)}>Trồng bông đầu tiên</button>
           </div>
         ) : (
           <ul className="grid grid-cols-3 gap-x-2 gap-y-6 pb-16 sm:grid-cols-4">

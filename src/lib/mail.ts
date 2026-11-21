@@ -1,6 +1,6 @@
 import "server-only";
 
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
 const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -21,15 +21,15 @@ export function mailHtml({ heading, body, cta = "Mở khu vườn" }: { heading?
 }
 
 export async function sendMail({ to, subject, heading, body }: { to: string; subject: string; heading?: string | null; body: string }) {
-  const key = process.env.RESEND_API_KEY;
-  if (!key) throw new Error("Chưa cấu hình RESEND_API_KEY");
-  const resend = new Resend(key);
-  const { error } = await resend.emails.send({
-    from: process.env.MAIL_FROM ?? "min vakre blomst <onboarding@resend.dev>",
+  const user = process.env.GMAIL_USER;
+  const pass = process.env.GMAIL_APP_PASSWORD?.replace(/\s/g, "");
+  if (!user || !pass) throw new Error("Chưa cấu hình GMAIL_USER / GMAIL_APP_PASSWORD");
+  const transport = nodemailer.createTransport({ service: "gmail", auth: { user, pass } });
+  await transport.sendMail({
+    from: { name: process.env.MAIL_FROM_NAME ?? "min vakre blomst", address: user },
     to,
     subject,
     html: mailHtml({ heading, body }),
     text: [heading, body].filter(Boolean).join("\n\n"),
   });
-  if (error) throw new Error(error.message);
 }

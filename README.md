@@ -16,7 +16,7 @@ Khu vườn kỷ niệm của hai đứa: mỗi dịp là một bông hoa, bấm
 | Điều ước | `/uoc` | Danh sách việc muốn cùng làm. |
 | Cài đặt | `/cai-dat` | Chỉ bro thấy: giờ mở khoá, ngày yêu nhau, thiệp mời, mail hẹn giờ, xem trước màn mở quà. |
 
-**Công nghệ:** Next.js 16 (App Router) · Tailwind CSS 4 · Supabase (Auth, Postgres + RLS, Storage, Realtime) · Resend (mail) · deploy Vercel.
+**Công nghệ:** Next.js 16 (App Router) · Tailwind CSS 4 · Supabase (Auth, Postgres + RLS, Storage, Realtime) · Gmail SMTP qua nodemailer (mail) · deploy Vercel.
 
 **Bảo mật:** chỉ 2 tài khoản trong bảng `members` vào được. Mọi quyền được kiểm ở DB bằng Row Level Security. Ẻm (role `partner`) **không đọc được gì trước giờ mở khoá** kể cả khi biết mật mã; bro (role `owner`) vào lúc nào cũng được để chuẩn bị. Ảnh/video nằm trong bucket riêng tư, chỉ hiện qua link có hạn 1 tiếng.
 
@@ -39,9 +39,10 @@ Khu vườn kỷ niệm của hai đứa: mỗi dịp là một bông hoa, bấm
    ```
 6. (Tuỳ chọn) Sửa các chỗ `<<...>>` trong `supabase/seed_birthday.sql` rồi chạy để có sẵn thư, thiệp mời, phiếu và mail sinh nhật. Hoặc tạo dần trong web.
 
-### 2. Resend (gửi mail)
-1. Tạo tài khoản <https://resend.com>, lấy API key.
-2. ⚠️ Địa chỉ mặc định `onboarding@resend.dev` **chỉ gửi được tới email của chính bro**. Muốn gửi cho ẻm thì phải mua tên miền và xác minh trong *Domains* (thêm vài bản ghi DNS), rồi đặt `MAIL_FROM=min vakre blomst <hoa@ten-mien-cua-bro.com>`.
+### 2. Gmail (gửi mail, miễn phí)
+1. Bật *Xác minh 2 bước* cho tài khoản Google sẽ dùng để gửi.
+2. Vào <https://myaccount.google.com/apppasswords>, tạo một *Mật khẩu ứng dụng* (16 ký tự).
+3. Đặt `GMAIL_USER=<gmail đó>` và `GMAIL_APP_PASSWORD=<16 ký tự>`. Mail sẽ gửi từ chính Gmail này tới bất kỳ ai, tối đa khoảng 500 mail/ngày.
 
 ### 3. Chạy ở máy
 ```bash
@@ -66,7 +67,7 @@ Endpoint `/api/cron/mails` gửi mọi mail trong bảng `scheduled_mails` đã 
 
 | Thời gian | Việc |
 |---|---|
-| 21/11 – 30/11 | Dựng Supabase, Vercel, Resend + tên miền. Đăng nhập thử bằng tài khoản owner. |
+| 21/11 – 30/11 | Dựng Supabase, Vercel, Gmail. Đăng nhập thử bằng tài khoản owner. |
 | 01/12 – 21/12 | Chỉnh giao diện theo gu hai đứa, thêm sticker tự vẽ, làm sticker từ ảnh mặt hai đứa. |
 | 22/12 – 04/01 | Gom ảnh cũ, tạo các bông hoa cho những dịp đã qua, trang trí từng trang. |
 | **05/01** | **Chốt tính năng.** Từ đây chỉ thêm nội dung và sửa lỗi. |

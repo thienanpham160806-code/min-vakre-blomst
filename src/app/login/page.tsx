@@ -25,8 +25,12 @@ export default function LoginPage() {
     setBusy(false);
     if (error) return setError("Sai rồi, thử nhớ lại xem 🥺");
     const { data: auth } = await sb.auth.getUser();
-    const { data: progress } = await sb.from("gift_progress").select("completed_at").eq("user_id", auth.user!.id).maybeSingle();
-    router.replace(progress ? "/vuon" : "/qua");
+    if (!auth.user) return setError("Phiên đăng nhập chưa sẵn sàng. Thử đăng nhập lại nha.");
+    const [{ data: member }, { data: progress }] = await Promise.all([
+      sb.from("members").select("role").eq("user_id", auth.user.id).maybeSingle(),
+      sb.from("gift_progress").select("completed_at").eq("user_id", auth.user.id).maybeSingle(),
+    ]);
+    router.replace(member?.role === "owner" || progress ? "/vuon" : "/qua");
   }
 
   return (

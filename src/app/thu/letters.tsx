@@ -45,8 +45,8 @@ export function Letters() {
 
       <div className="mx-auto max-w-2xl space-y-8 px-5">
         <section>
-          <h2 className="mb-3 font-semibold text-ink-soft">Thư {partner?.display_name ?? "người ấy"} gửi</h2>
-          {received.length === 0 && locked.length === 0 && <p className="font-hand text-lg text-ink-soft">Chưa có thư nào.</p>}
+          <h2 className="section-title">Thư {partner?.display_name ?? "người ấy"} gửi</h2>
+          {received.length === 0 && locked.length === 0 && <p className="empty-note">Chưa có thư nào.</p>}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {received.map((l) => (
               <Envelope key={l.id} title={l.title} sub={formatDate(l.created_at)} onClick={() => setReading(l)} />
@@ -58,8 +58,8 @@ export function Letters() {
         </section>
 
         <section>
-          <h2 className="mb-3 font-semibold text-ink-soft">Thư mình đã viết</h2>
-          {sent.length === 0 && <p className="font-hand text-lg text-ink-soft">Viết lá đầu tiên đi.</p>}
+          <h2 className="section-title">Thư mình đã viết</h2>
+          {sent.length === 0 && <p className="empty-note">Viết lá đầu tiên đi.</p>}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {sent.map((l) => (
               <Envelope

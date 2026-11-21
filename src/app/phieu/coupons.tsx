@@ -44,8 +44,8 @@ export function Coupons() {
 
       <div className="mx-auto max-w-2xl space-y-8 px-5">
         <section>
-          <h2 className="mb-3 font-semibold text-ink-soft">Phiếu mình được tặng</h2>
-          {mine.length === 0 && <p className="font-hand text-lg text-ink-soft">Chưa có phiếu nào.</p>}
+          <h2 className="section-title">Phiếu mình được tặng</h2>
+          {mine.length === 0 && <p className="empty-note">Chưa có phiếu nào.</p>}
           <div className="space-y-3">
             {mine.map((c) => (
               <Ticket key={c.id} c={c} action={!c.redeemed_at ? <button className="btn btn-primary px-4 py-2 text-sm" onClick={() => redeem(c)}>Dùng</button> : null} />
@@ -53,8 +53,8 @@ export function Coupons() {
           </div>
         </section>
         <section>
-          <h2 className="mb-3 font-semibold text-ink-soft">Phiếu mình đã tặng</h2>
-          {given.length === 0 && <p className="font-hand text-lg text-ink-soft">Tặng người ấy vài phiếu đi.</p>}
+          <h2 className="section-title">Phiếu mình đã tặng</h2>
+          {given.length === 0 && <p className="empty-note">Tặng người ấy vài phiếu đi.</p>}
           <div className="space-y-3">
             {given.map((c) => (
               <Ticket

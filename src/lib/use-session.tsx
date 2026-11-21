@@ -15,7 +15,7 @@ type State =
 const Ctx = createContext<State>({ status: "loading" });
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const left = useUnlock();
+  const { left } = useUnlock();
   const locked = left === null || left > 0;
   const [state, setState] = useState<State>({ status: "loading" });
 

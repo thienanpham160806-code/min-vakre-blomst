@@ -16,9 +16,15 @@ function parts(ms: number) {
   };
 }
 
+/** Hiển thị đúng mốc máy chủ ngay cả khi đồng hồ thiết bị bị lệch. */
+function unlockLabel(unlockAt: string) {
+  const at = new Date(unlockAt);
+  return new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", day: "numeric", month: "long" }).format(at);
+}
+
 export function Countdown() {
-  const left = useUnlock();
-  if (left === null) return <p>Đang đồng bộ giờ mở quà…</p>;
+  const { left, unlockAt } = useUnlock();
+  if (left === null) return <p className="font-hand text-lg text-white/70 animate-fade">Đang đồng bộ giờ mở quà…</p>;
   const opened = left <= 0;
 
   return (
@@ -30,14 +36,15 @@ export function Countdown() {
         {!opened ? (
           <>
             <p className="mt-3 font-hand text-lg text-white/70">có một thứ đang chờ nở…</p>
-            <div className="mt-10 grid grid-cols-4 gap-3 sm:gap-5">
+            <div className="mt-10 grid grid-cols-4 gap-2.5 sm:gap-4" role="timer" aria-live="off">
               {Object.entries(parts(left)).map(([label, v]) => (
-                <div key={label} className="flex w-16 flex-col items-center rounded-2xl bg-white/10 py-3 backdrop-blur sm:w-20">
-                  <span className="text-3xl font-semibold tabular-nums sm:text-4xl">{String(v).padStart(2, "0")}</span>
-                  <span className="text-xs text-white/60">{label}</span>
+                <div key={label} className="flex w-14 min-[360px]:w-16 flex-col items-center rounded-2xl bg-white/[0.07] py-3.5 ring-1 ring-inset ring-white/10 sm:w-20">
+                  <span className="text-3xl font-semibold tabular-nums tracking-tight sm:text-4xl">{String(v).padStart(2, "0")}</span>
+                  <span className="mt-0.5 font-hand text-sm text-white/65">{label}</span>
                 </div>
               ))}
             </div>
+            {unlockAt && <p className="mt-6 font-hand text-base text-white/60">{unlockLabel(unlockAt)}</p>}
           </>
         ) : (
           <>
@@ -61,8 +68,8 @@ function FloatingFlowers({ bloomed }: { bloomed: boolean }) {
           className="origin-bottom animate-sway transition-all duration-1000"
           style={{
             animationDelay: `${i * 0.4}s`,
-            height: bloomed ? `${140 + (i % 3) * 40}px` : `${40 + (i % 3) * 14}px`,
-            opacity: bloomed ? 1 : 0.35,
+            height: bloomed ? `${140 + (i % 3) * 40}px` : `${72 + (i % 3) * 18}px`,
+            opacity: bloomed ? 1 : 0.5,
           }}
         >
           <Flower kind={k} color={colors[i]} className="h-full w-auto" />

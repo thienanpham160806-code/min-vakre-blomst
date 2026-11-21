@@ -5,7 +5,7 @@ import { supabaseBrowser } from "./supabase/client";
 import { remainingMs, type UnlockInfo } from "./unlock";
 
 export function useUnlock() {
-  const [left, setLeft] = useState<number | null>(null);
+  const [clock, setClock] = useState<{ left: number | null; unlockAt: string | null }>({ left: null, unlockAt: null });
   useEffect(() => {
     let alive = true;
     let sample: { info: UnlockInfo; at: number } | null = null;
@@ -26,11 +26,11 @@ export function useUnlock() {
           nextSync = performance.now() + (remaining > 0 && remaining < 10_000 ? 1000 : 10_000);
         }
       }
-      if (alive && sample) setLeft(remainingMs(sample.info, performance.now() - sample.at));
+      if (alive && sample) setClock({ left: remainingMs(sample.info, performance.now() - sample.at), unlockAt: sample.info.unlock_at });
     }
     void tick();
     const timer = setInterval(() => void tick(), 1000);
     return () => { alive = false; clearInterval(timer); };
   }, []);
-  return left;
+  return clock;
 }

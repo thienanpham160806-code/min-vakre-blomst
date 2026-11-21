@@ -67,7 +67,7 @@ export function Wishes() {
 
         {done.length > 0 && (
           <section>
-            <h2 className="mb-2 font-semibold text-ink-soft">Đã làm được ✨</h2>
+            <h2 className="section-title">Đã làm được ✨</h2>
             <ul className="space-y-2">
               {done.map((w) => (
                 <li key={w.id} className="flex flex-wrap items-center gap-3 rounded-2xl bg-sage/20 p-3">
